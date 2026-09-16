@@ -15,6 +15,18 @@ use GdImage;
  */
 final class ImageTranscoder
 {
+    /** Hoeveel punten we per zijde bekijken om de kleur van de rand te bepalen. */
+    private const EDGE_SAMPLES = 128;
+
+    /** Tot hier telt een randpixel als dekkend; daarboven is het geen achtergrond. */
+    private const EDGE_OPAQUE = 10;
+
+    /** Zoveel van de rand moet dezelfde kleur dragen voordat het er een is. */
+    private const EDGE_MAJORITY = 0.8;
+
+    /** Hoeveel een randpixel per kanaal mag afwijken. Een jpeg ruist. */
+    private const EDGE_TOLERANCE = 12;
+
     public function __construct(private readonly Trimmer $trimmer = new Trimmer()) {}
 
     /** Kan deze installatie uberhaupt webp schrijven? */
@@ -115,6 +127,15 @@ final class ImageTranscoder
         $sourceWidth = imagesx($source);
         $sourceHeight = imagesy($source);
 
+        /*
+        | Allebei voor het trimmen, en dat is geen detail. De rand die we straks
+        | verlengen is juist wat de trimmer weghaalt: daarna staat daar het
+        | beeldmerk zelf. En of de bron doorzichtigheid had, is een eigenschap
+        | van de bron; de uitvoer kan die na het opvullen niet meer tonen.
+        */
+        $fill = $this->padColour($source, $config);
+        $sourceHasAlpha = $this->hasAlpha($source);
+
         $trimmed = $this->trimmer->trim($source, $config);
 
         if (! $trimmed instanceof GdImage) {
@@ -147,7 +168,19 @@ final class ImageTranscoder
         */
         imagealphablending($canvas, false);
         imagesavealpha($canvas, true);
-        imagefilledrectangle($canvas, 0, 0, $size - 1, $size - 1, imagecolorallocatealpha($canvas, 0, 0, 0, 127));
+        imagefilledrectangle($canvas, 0, 0, $size - 1, $size - 1, $fill === null
+            ? imagecolorallocatealpha($canvas, 0, 0, 0, 127)
+            : imagecolorallocate($canvas, $fill[0], $fill[1], $fill[2]));
+
+        if ($fill !== null) {
+            /*
+            | Nu wel blenden: een logo met eigen doorzichtigheid hoort op deze
+            | kleur samengesteld te worden en er geen gaten in te slaan. En het
+            | alfakanaal mag uit de uitvoer, want er valt niets meer door te zien.
+            */
+            imagealphablending($canvas, true);
+            imagesavealpha($canvas, false);
+        }
 
         imagecopyresampled(
             $canvas,
@@ -169,7 +202,7 @@ final class ImageTranscoder
             sourceWidth: $sourceWidth,
             sourceHeight: $sourceHeight,
             sourceRatio: max($sourceWidth, $sourceHeight) / max(1, min($sourceWidth, $sourceHeight)),
-            hasAlpha: $this->hasAlpha($canvas),
+            hasAlpha: $sourceHasAlpha,
             trimmed: $wasTrimmed,
             lossless: $lossless,
         );
@@ -231,6 +264,92 @@ final class ImageTranscoder
         imagewebp($image, null, $quality);
 
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Waarmee de lucht rond het logo opgevuld wordt, of null voor doorzichtig.
+     *
+     * @param  array<string, mixed>  $config
+     * @return array{0: int, 1: int, 2: int}|null
+     */
+    private function padColour(GdImage $source, array $config): ?array
+    {
+        if ((string) ($config['pad'] ?? 'edge') === 'transparent') {
+            return null;
+        }
+
+        // Wit als de rand geen hoofdkleur heeft: dat is de neutrale keuze, en
+        // een kleur uit het beeldmerk zelf zou het logo laten verdwijnen.
+        return $this->edgeColour($source) ?? [255, 255, 255];
+    }
+
+    /**
+     * De hoofdkleur langs de vier randen van het beeld, of null als er geen is.
+     *
+     * Een achtergrond is pas een achtergrond als hij de rand ook echt beheerst.
+     * Vandaar twee drempels: het grootste deel van de rand moet dekkend zijn en
+     * het grootste deel moet dicht bij dezelfde kleur liggen. Een logo dat op
+     * transparant staat zakt door de eerste, een foto of een verloop door de
+     * tweede, en allebei eindigen ze dus op wit.
+     *
+     * De mediaan en niet het gemiddelde: een jpeg ruist een paar eenheden per
+     * kanaal, en de pixels van een beeldmerk dat de rand raakt mogen de kleur
+     * niet meetrekken.
+     *
+     * @return array{0: int, 1: int, 2: int}|null
+     */
+    private function edgeColour(GdImage $source): ?array
+    {
+        $width = imagesx($source);
+        $height = imagesy($source);
+        $step = max(1, intdiv(max($width, $height), self::EDGE_SAMPLES));
+
+        $samples = 0;
+        $pixels = [];
+
+        $take = function (int $x, int $y) use ($source, &$samples, &$pixels): void {
+            $samples++;
+            $colour = imagecolorat($source, $x, $y);
+
+            if ((($colour >> 24) & 0x7F) <= self::EDGE_OPAQUE) {
+                $pixels[] = [($colour >> 16) & 0xFF, ($colour >> 8) & 0xFF, $colour & 0xFF];
+            }
+        };
+
+        for ($x = 0; $x < $width; $x += $step) {
+            $take($x, 0);
+            $take($x, $height - 1);
+        }
+
+        for ($y = 0; $y < $height; $y += $step) {
+            $take(0, $y);
+            $take($width - 1, $y);
+        }
+
+        if ($samples === 0 || count($pixels) < $samples * self::EDGE_MAJORITY) {
+            return null;
+        }
+
+        $middle = intdiv(count($pixels), 2);
+        $colour = [];
+
+        foreach ([0, 1, 2] as $channel) {
+            $values = array_column($pixels, $channel);
+            sort($values);
+            $colour[$channel] = $values[$middle];
+        }
+
+        $near = 0;
+
+        foreach ($pixels as $pixel) {
+            if (abs($pixel[0] - $colour[0]) <= self::EDGE_TOLERANCE
+                && abs($pixel[1] - $colour[1]) <= self::EDGE_TOLERANCE
+                && abs($pixel[2] - $colour[2]) <= self::EDGE_TOLERANCE) {
+                $near++;
+            }
+        }
+
+        return $near >= $samples * self::EDGE_MAJORITY ? $colour : null;
     }
 
     private function hasAlpha(GdImage $image): bool

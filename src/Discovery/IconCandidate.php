@@ -12,6 +12,11 @@ final class IconCandidate
         public readonly string $source,
         /** Wat het sizes-attribuut of het manifest beweert. Een bewering, geen meting. */
         public readonly ?int $declaredSize = null,
+        /**
+         * De vorm die daarbij beweerd werd: de langste zijde gedeeld door de
+         * kortste, dus altijd 1 of meer. Null als de bron er niets over zei.
+         */
+        public readonly ?float $declaredRatio = null,
         public readonly ?string $mime = null,
         /** Een maskable icoon wordt door het toestel aan de randen afgesneden. */
         public readonly bool $maskable = false,
@@ -26,6 +31,7 @@ final class IconCandidate
             url: $this->url,
             source: $this->source,
             declaredSize: $this->declaredSize,
+            declaredRatio: $this->declaredRatio,
             mime: $this->mime,
             maskable: $this->maskable,
             measuredWidth: $width,

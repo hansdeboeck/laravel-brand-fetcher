@@ -98,10 +98,15 @@ final class IconDiscoverer
                 continue;
             }
 
+            [$declaredSize, $declaredRatio] = $this->declaredShape(
+                (string) $node->attributes?->getNamedItem('sizes')?->nodeValue,
+            );
+
             $found[] = new IconCandidate(
                 url: $url,
                 source: $source,
-                declaredSize: $this->largestSize((string) $node->attributes?->getNamedItem('sizes')?->nodeValue),
+                declaredSize: $declaredSize,
+                declaredRatio: $declaredRatio,
                 mime: $this->mime((string) $node->attributes?->getNamedItem('type')?->nodeValue),
             );
         }
@@ -175,15 +180,24 @@ final class IconDiscoverer
             }
 
             $declared = null;
+            $ratio = null;
 
             if (is_array($logo)) {
-                $declared = max((int) ($logo['width'] ?? 0), (int) ($logo['height'] ?? 0)) ?: null;
+                $width = (int) ($logo['width'] ?? 0);
+                $height = (int) ($logo['height'] ?? 0);
+                $declared = max($width, $height) ?: null;
+                $ratio = $width > 0 && $height > 0 ? max($width, $height) / min($width, $height) : null;
             }
 
             $absolute = Url::absolutise($url, (string) $crawl->baseUrl);
 
             if ($absolute !== null) {
-                $found[] = new IconCandidate(url: $absolute, source: 'jsonld', declaredSize: $declared);
+                $found[] = new IconCandidate(
+                    url: $absolute,
+                    source: 'jsonld',
+                    declaredSize: $declared,
+                    declaredRatio: $ratio,
+                );
             }
         }
 
@@ -243,10 +257,13 @@ final class IconDiscoverer
                 continue;
             }
 
+            [$declaredSize, $declaredRatio] = $this->declaredShape((string) ($icon['sizes'] ?? ''));
+
             $found[] = new IconCandidate(
                 url: $url,
                 source: 'manifest',
-                declaredSize: $this->largestSize((string) ($icon['sizes'] ?? '')),
+                declaredSize: $declaredSize,
+                declaredRatio: $declaredRatio,
                 mime: $this->mime((string) ($icon['type'] ?? '')),
                 maskable: str_contains($purpose, 'maskable'),
             );
@@ -304,6 +321,12 @@ final class IconDiscoverer
                 url: $winner->url,
                 source: $winner->source,
                 declaredSize: max($candidate->declaredSize ?? 0, $existing->declaredSize ?? 0) ?: null,
+                /*
+                | Bij de maat telt de grootste bewering, bij de vorm de minst
+                | vierkante: zegt een van beide bronnen dat dit bestand niet
+                | vierkant is, dan geldt dat voor het bestand zelf.
+                */
+                declaredRatio: max($candidate->declaredRatio ?? 0.0, $existing->declaredRatio ?? 0.0) ?: null,
                 mime: $winner->mime ?? ($candidate->mime ?? $existing->mime),
                 maskable: $winner->maskable,
             );
@@ -312,25 +335,43 @@ final class IconDiscoverer
         return array_values($unique);
     }
 
-    /** sizes kan meerdere maten dragen: "32x32 16x16". De grootste telt. */
-    private function largestSize(string $sizes): ?int
+    /**
+     * Wat een sizes-attribuut over maat en vorm beweert.
+     *
+     * Sizes kan meerdere maten dragen: "32x32 16x16". De grootste telt, en de
+     * vorm komt van datzelfde paar: bij "512x256 32x32" kijken we naar de
+     * 512x256 en niet naar het vierkantje ernaast.
+     *
+     * @return array{0: ?int, 1: ?float} de langste zijde en de verhouding
+     */
+    private function declaredShape(string $sizes): array
     {
         $sizes = strtolower(trim($sizes));
 
         // "any" betekent schaalbaar, en dat is altijd een svg.
         if ($sizes === '' || $sizes === 'any') {
-            return null;
+            return [null, null];
         }
 
         $largest = 0;
+        $ratio = null;
 
         foreach (preg_split('/\s+/', $sizes, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $pair) {
-            if (preg_match('/^(\d+)x(\d+)$/', $pair, $match)) {
-                $largest = max($largest, (int) $match[1], (int) $match[2]);
+            if (! preg_match('/^(\d+)x(\d+)$/', $pair, $match)) {
+                continue;
+            }
+
+            $width = (int) $match[1];
+            $height = (int) $match[2];
+            $edge = max($width, $height);
+
+            if ($edge > $largest) {
+                $largest = $edge;
+                $ratio = $edge / max(1, min($width, $height));
             }
         }
 
-        return $largest > 0 ? $largest : null;
+        return $largest > 0 ? [$largest, $ratio] : [null, null];
     }
 
     private function mime(string $type): ?string

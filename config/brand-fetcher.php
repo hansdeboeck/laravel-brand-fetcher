@@ -43,6 +43,20 @@ return [
     'trim' => (bool) env('BRAND_FETCHER_TRIM', true),
     'trim_threshold' => (int) env('BRAND_FETCHER_TRIM_THRESHOLD', 8),
 
+    /*
+    | Waarmee de lucht rond het logo opgevuld wordt.
+    |
+    | edge         de hoofdkleur aan de rand van de bron, en wit als de rand er
+    |              geen heeft. Een logo dat zijn eigen achtergrond meebrengt
+    |              wordt zo een effen tegel in plaats van een band die zweeft.
+    | transparent  de lucht doorzichtig laten, zoals tot en met v1.1.
+    |
+    | Met edge levert dit package nooit nog een doorzichtig beeld af, ook niet
+    | voor een logo dat zelf transparant was. Wie het op een donkere achtergrond
+    | zet, is met transparent beter af.
+    */
+    'pad' => env('BRAND_FETCHER_PAD', 'edge'),
+
     // De terugval als er niets bruikbaars gevonden is: de beginletter op een
     // gekleurde schijf. Staat dit uit, dan komt er helemaal geen bestand.
     'monogram' => (bool) env('BRAND_FETCHER_MONOGRAM', true),

@@ -202,6 +202,26 @@ function htmlFixture(array $options = []): string
     HTML;
 }
 
+/** Een liggend beeld met een effen achtergrond en een licht merk erin. */
+function bannerFixture(int $width, int $height, array $rgb): string
+{
+    $image = imagecreatetruecolor($width, $height);
+    imagefilledrectangle($image, 0, 0, $width - 1, $height - 1, imagecolorallocate($image, $rgb[0], $rgb[1], $rgb[2]));
+    imagefilledellipse(
+        $image,
+        intdiv($width, 2),
+        intdiv($height, 2),
+        intdiv($width, 2),
+        intdiv($height, 2),
+        imagecolorallocate($image, 255, 255, 255),
+    );
+
+    ob_start();
+    imagepng($image);
+
+    return (string) ob_get_clean();
+}
+
 /** Een webmanifest met iconen erin. */
 function manifestFixture(array $icons): string
 {

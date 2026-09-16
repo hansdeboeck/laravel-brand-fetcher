@@ -56,6 +56,7 @@ final class CandidateScorer
         return (self::SOURCE_WEIGHT[$candidate->source] ?? 40)
             + $this->mimeBonus($candidate)
             + $this->sizeBonus($candidate->declaredSize)
+            + $this->declaredRatioPenalty($candidate->declaredRatio)
             + ($candidate->maskable ? -8 : 0);
     }
 
@@ -74,6 +75,29 @@ final class CandidateScorer
             + $this->ratioBonus($width, $height)
             + ($candidate->hasAlpha ? 15 : 0)
             + ($candidate->maskable ? -8 : 0);
+    }
+
+    /**
+     * Wat een kandidaat kwijtspeelt omdat hij zelf zegt niet vierkant te zijn.
+     *
+     * Een bewering over de maat is goedkoop, maar een bewering over de vorm is
+     * er een in het eigen nadeel, en die is dus wel te geloven: een manifest
+     * dat "512x256" opgeeft, zegt eerlijk dat er geen vierkant logo in zit.
+     *
+     * De aftrek is zo gekozen dat zo'n icoon in de volgorde onder de avatar van
+     * een bedrijfspagina zakt, want die is per definitie vierkant. De socials
+     * worden dan eerst gedownload. Blijkt het bestand tegen zijn eigen bewering
+     * in toch vierkant, dan is er niets verloren: de harde score kijkt alleen
+     * naar wat gemeten is.
+     */
+    private function declaredRatioPenalty(?float $ratio): int
+    {
+        // Een pixel scheef is nog vierkant genoeg; "512x511" bestaat.
+        if ($ratio === null || $ratio <= 1.02) {
+            return 0;
+        }
+
+        return -50;
     }
 
     /** Hier zit de voorkeur voor vierkant. */

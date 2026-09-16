@@ -158,6 +158,7 @@ echte index voor, en die past niet in een package dat geen databank mag eisen.
 | `storage.disk` | `local` | welke Laravel-disk |
 | `storage.folder` | `hans/brand` | de map daarbinnen |
 | `size` | `128` | de zijde van het vierkante beeld |
+| `pad` | `edge` | de lucht rond het logo opvullen met de randkleur, of `transparent` |
 | `on_miss` | `monogram` | zie hierboven |
 | `ttl_ok` | 30 dagen | hoe lang een gevonden logo meegaat |
 | `ttl_monogram` | 7 dagen | een site kan alsnog een favicon krijgen |
@@ -199,8 +200,26 @@ grote regelmaat een bestand van zestien pixels met `sizes="32x32"` erbij.
 Vierkant weegt zwaar, een liggende socialekaart weegt licht, en transparantie
 telt mee omdat een logo met alfa vrijwel altijd een echt logo is.
 
-Vierkant maken gebeurt door te **passen** binnen het vierkant, met de lucht
-eromheen doorzichtig. Nooit uitrekken en nooit het beeldmerk bijsnijden.
+Op een punt geloven we de verklaring wel. Zegt een bron zelf dat zijn icoon
+niet vierkant is, met een maat als `512x256` in het manifest, dan is dat een
+bewering in het eigen nadeel en dus geen grootspraak. Dat icoon verliest zijn
+voorsprong in de volgorde, en de avatar van de bedrijfspagina wordt eerst
+gedownload: die is per definitie vierkant. Was die avatar goed genoeg, dan
+wordt het liggende beeld niet meer opgehaald.
+
+Vierkant maken gebeurt door te **passen** binnen het vierkant. Nooit uitrekken
+en nooit het beeldmerk bijsnijden.
+
+De lucht eromheen krijgt de **hoofdkleur van de rand** van de bron. Een logo dat
+zijn eigen achtergrond meebrengt, een liggend beeld op een gekleurd vlak, wordt
+zo een effen tegel in plaats van een band die in het niets zweeft. Heeft die
+rand geen hoofdkleur, omdat het logo op transparant staat of omdat de rand een
+foto is, dan wordt de vulling wit. Een beeld dat het vierkant zelf volmaakt,
+merkt er niets van.
+
+Daardoor levert dit package standaard geen doorzichtig beeld meer af. Wie het
+logo op een donkere achtergrond zet, zet `pad` op `transparent`; dan blijft de
+lucht doorzichtig zoals tot en met v1.1.
 
 **Svg** wordt niet gerasteriseerd: gd kan het niet, en een svg-parser loslaten op
 bytes van een vreemde server is een aanvalsoppervlak dat dit package niet wil

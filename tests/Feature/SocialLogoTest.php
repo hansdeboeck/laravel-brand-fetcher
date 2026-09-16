@@ -232,6 +232,55 @@ it('laat de instelling een bron helemaal uitzetten', function (string $sleutel, 
     'linkedin' => ['linkedin_logo', 'www.linkedin.com', ['https://be.linkedin.com/company/acme-nv']],
 ]);
 
+/** Op welke plaats in de reeks verzoeken deze url voor het eerst langskwam. */
+function verzochtOp(string $fragment): ?int
+{
+    $plaats = collect(Http::recorded())
+        ->values()
+        ->search(fn (array $paar): bool => str_contains($paar[0]->url(), $fragment));
+
+    return $plaats === false ? null : (int) $plaats;
+}
+
+/** Een site met een manifest waar een icoon van de opgegeven maat in staat. */
+function fakeSociaalMetManifest(string $maat, int $breedte, int $hoogte): void
+{
+    fakeSociaal(
+        ['https://www.facebook.com/Acme'],
+        [
+            'https://acme.be/site.webmanifest' => Http::response(
+                manifestFixture([['src' => '/logo.png', 'sizes' => $maat, 'type' => 'image/png']]),
+            ),
+            'https://acme.be/logo.png' => Http::response(pngFixture($breedte, $hoogte), 200, ['Content-Type' => 'image/png']),
+        ],
+        ['links' => ['<link rel="manifest" href="/site.webmanifest">']],
+    );
+}
+
+/*
+| Een manifest dat zelf een liggende maat opgeeft.
+|
+| Over zijn maat overdrijft een site graag, maar over zijn vorm liegt niemand
+| in het eigen nadeel. Zegt het manifest dus "512x256", dan zit daar geen
+| vierkant logo in en gaat de avatar van de bedrijfspagina voor: die is per
+| definitie vierkant. Of dat liggende beeld daarna nog gedownload wordt, hangt
+| ervan af of de avatar al goed genoeg was; eerst aan de beurt komt het nooit.
+*/
+it('haalt de avatar voor een manifest-icoon dat zelf zegt niet vierkant te zijn', function (): void {
+    fakeSociaalMetManifest('512x256', 512, 256);
+
+    expect(app(BrandFetcher::class)->logo('acme.be')->source)->toBe('facebook')
+        ->and(verzochtOp('fbcdn.net'))->not->toBeNull()
+        ->and(verzochtOp('acme.be/logo.png') ?? PHP_INT_MAX)->toBeGreaterThan(verzochtOp('fbcdn.net'));
+});
+
+it('houdt een vierkant manifest-icoon voor de avatar', function (): void {
+    fakeSociaalMetManifest('512x512', 512, 512);
+
+    expect(app(BrandFetcher::class)->logo('acme.be')->source)->toBe('manifest')
+        ->and(verzochten('fbcdn.net'))->toBe(0);
+});
+
 it('gaat niet op pad als alleen de profielen gevraagd worden', function (): void {
     fakeSociaal(['https://www.facebook.com/Acme', 'https://be.linkedin.com/company/acme-nv']);
 

@@ -5,12 +5,13 @@ declare(strict_types=1);
 use HansDeBoeck\BrandFetcher\Discovery\CandidateScorer;
 use HansDeBoeck\BrandFetcher\Discovery\IconCandidate;
 
-function candidate(string $source, ?int $declared, ?string $mime, int $width, int $height, bool $alpha = true): IconCandidate
+function candidate(string $source, ?int $declared, ?string $mime, int $width, int $height, bool $alpha = true, ?float $vorm = null): IconCandidate
 {
     return (new IconCandidate(
         url: 'https://acme.be/beeld',
         source: $source,
         declaredSize: $declared,
+        declaredRatio: $vorm,
         mime: $mime,
     ))->measured($width, $height, $alpha);
 }
@@ -46,7 +47,11 @@ it('gebruikt de gemeten afmetingen en niet het sizes-attribuut', function (): vo
 });
 
 it('straft svg zo zwaar dat die nooit kan winnen', function (): void {
-    $svg = (new IconCandidate('https://acme.be/logo.svg', 'link-icon', null, 'image/svg+xml'))->measured(512, 512, true);
+    $svg = (new IconCandidate(
+        url: 'https://acme.be/logo.svg',
+        source: 'link-icon',
+        mime: 'image/svg+xml',
+    ))->measured(512, 512, true);
 
     expect($this->scorer->hard($svg))->toBeLessThan(0);
 });
@@ -93,3 +98,33 @@ it('laat een sociale avatar de zoektocht nooit afbreken', function (string $bron
     'facebook' => ['facebook', 480, 'image/png'],
     'linkedin' => ['linkedin', 400, 'image/jpeg'],
 ]);
+
+/*
+| Een bewering over de maat is goedkoop, maar een bewering over de vorm is er
+| een in het eigen nadeel. Zegt een manifest zelf dat zijn icoon liggend is,
+| dan verliest het zijn voorsprong in de volgorde en worden de avatars van de
+| bedrijfspagina eerst gedownload: die zijn per definitie vierkant.
+*/
+it('zet een bron die zelf zegt niet vierkant te zijn onder de socials', function (): void {
+    $liggend = candidate('manifest', 512, 'image/png', 512, 256, vorm: 2.0);
+    $facebook = candidate('facebook', 480, 'image/png', 480, 480, false);
+    $linkedin = candidate('linkedin', 200, 'image/jpeg', 200, 200, false);
+
+    expect($this->scorer->paper($liggend))->toBeLessThan($this->scorer->paper($facebook))
+        ->and($this->scorer->paper($liggend))->toBeLessThan($this->scorer->paper($linkedin));
+});
+
+it('laat een vierkante bewering zijn voorsprong houden', function (): void {
+    $vierkant = candidate('manifest', 512, 'image/png', 512, 512, vorm: 1.0);
+    $facebook = candidate('facebook', 480, 'image/png', 480, 480, false);
+
+    expect($this->scorer->paper($vierkant))->toBeGreaterThan($this->scorer->paper($facebook));
+});
+
+it('rekent een pixel scheef nog als vierkant', function (): void {
+    // "512x511" bestaat, en dat is geen liggend beeld maar een afronding.
+    $bijna = candidate('manifest', 512, 'image/png', 512, 511, vorm: 512 / 511);
+    $precies = candidate('manifest', 512, 'image/png', 512, 512, vorm: 1.0);
+
+    expect($this->scorer->paper($bijna))->toBe($this->scorer->paper($precies));
+});

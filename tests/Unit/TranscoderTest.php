@@ -28,30 +28,77 @@ it('levert altijd een vierkante webp van 128 pixels', function (string $bytes): 
     'ico met dib-frame' => fn () => icoFixture([[48, 48, 24, dibFrameFixture(48, 48, 24)]]),
 ]);
 
-it('behoudt de transparantie rond het logo', function (): void {
-    $result = $this->transcoder->transcode(pngFixture(1200, 630), 128, $this->config);
+/** De kleur en de doorzichtigheid van een pixel in de uitvoer. */
+function kleurOp(string $bytes, int $x, int $y): array
+{
+    $colour = imagecolorat(imagecreatefromstring($bytes), $x, $y);
+
+    return [($colour >> 16) & 0xFF, ($colour >> 8) & 0xFF, $colour & 0xFF, ($colour >> 24) & 0x7F];
+}
+
+it('vult de lucht met de hoofdkleur van de rand', function (): void {
+    // Een liggend beeld met een blauw vlak eromheen wordt een blauwe tegel en
+    // geen band die in het niets zweeft.
+    $result = $this->transcoder->transcode(bannerFixture(512, 256, [10, 60, 180]), 128, $this->config);
+
+    [$rood, $groen, $blauw, $alfa] = kleurOp($result->bytes, 2, 2);
+
+    expect($alfa)->toBe(0)
+        ->and($rood)->toEqualWithDelta(10, 8)
+        ->and($groen)->toEqualWithDelta(60, 8)
+        ->and($blauw)->toEqualWithDelta(180, 8);
+});
+
+it('vult met wit als het logo zelf geen achtergrond heeft', function (): void {
+    $result = $this->transcoder->transcode(pngFixture(512, 256), 128, $this->config);
+
+    [$rood, $groen, $blauw, $alfa] = kleurOp($result->bytes, 2, 2);
+
+    expect($alfa)->toBe(0)
+        ->and(min($rood, $groen, $blauw))->toBeGreaterThan(247);
+});
+
+it('behoudt de transparantie rond het logo als pad op transparent staat', function (): void {
+    $config = $this->config;
+    $config['pad'] = 'transparent';
+
+    $result = $this->transcoder->transcode(pngFixture(1200, 630), 128, $config);
     $image = imagecreatefromstring($result->bytes);
 
     expect((imagecolorat($image, 2, 2) >> 24) & 0x7F)->toBe(127)
         ->and((imagecolorat($image, 64, 64) >> 24) & 0x7F)->toBe(0);
 });
 
+/*
+| De harde score beloont een bron met alfa, want die is vrijwel altijd een echt
+| logo. Dat signaal gaat over de bron en niet over wat wij afleveren: werd het
+| op de uitvoer gemeten, dan viel het met een dekkende vulling voor iedereen weg.
+*/
+it('meldt de doorzichtigheid van de bron en niet van de opgevulde uitvoer', function (): void {
+    $doorzichtig = $this->transcoder->transcode(pngFixture(512, 256), 128, $this->config);
+    $dekkend = $this->transcoder->transcode(bannerFixture(512, 256, [10, 60, 180]), 128, $this->config);
+
+    expect($doorzichtig->hasAlpha)->toBeTrue()
+        ->and($dekkend->hasAlpha)->toBeFalse();
+});
+
 it('schaalt een kleine bron niet op', function (): void {
     $result = $this->transcoder->transcode(pngFixture(16, 16), 128, $this->config);
     $image = imagecreatefromstring($result->bytes);
 
-    $opaque = 0;
+    $merk = 0;
 
     for ($y = 0; $y < 128; $y++) {
         for ($x = 0; $x < 128; $x++) {
-            if ((((imagecolorat($image, $x, $y) >> 24) & 0x7F)) < 64) {
-                $opaque++;
+            // Alles wat niet de witte vulling is, hoort bij het beeldmerk.
+            if (((imagecolorat($image, $x, $y) >> 8) & 0xFF) < 200) {
+                $merk++;
             }
         }
     }
 
     // Opschalen zou het hele vlak vullen; passend plaatsen houdt het klein.
-    expect($opaque)->toBeLessThan(600);
+    expect($merk)->toBeLessThan(600);
 });
 
 it('snijdt de lucht rond een logo weg', function (): void {
