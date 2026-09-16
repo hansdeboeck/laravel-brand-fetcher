@@ -45,6 +45,7 @@ class BrandFetcherServiceProvider extends ServiceProvider
                 $app->make(BrandStore::class),
                 $app->make(SafeHttp::class),
                 $app['config']->get('brand-fetcher', []),
+                $app->make(Queue\RefreshQueue::class),
             );
         });
 

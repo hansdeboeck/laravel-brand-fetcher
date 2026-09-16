@@ -16,6 +16,7 @@ use HansDeBoeck\BrandFetcher\Image\MonogramRenderer;
 use HansDeBoeck\BrandFetcher\Net\Budget;
 use HansDeBoeck\BrandFetcher\Net\DomainNormalizer;
 use HansDeBoeck\BrandFetcher\Net\SafeHttp;
+use HansDeBoeck\BrandFetcher\Queue\RefreshQueue;
 use HansDeBoeck\BrandFetcher\Social\SocialDiscoverer;
 use HansDeBoeck\BrandFetcher\Social\SocialProfile;
 use HansDeBoeck\BrandFetcher\Storage\BrandStore;
@@ -61,6 +62,7 @@ class BrandFetcher implements FetchesBrands
         private readonly BrandStore $store,
         private readonly SafeHttp $http,
         private readonly array $config = [],
+        private readonly ?RefreshQueue $queue = null,
     ) {
         $this->scorer = new CandidateScorer();
         $this->crawler = new SiteCrawler($http, $config);
@@ -349,6 +351,16 @@ class BrandFetcher implements FetchesBrands
             profiles: $previous?->profiles ?? [],
             name: $previous?->name,
         );
+
+        /*
+        | Komt dit domein hier voor het eerst, dan gaat het echte werk naar de
+        | queue: dan staat het logo er binnen seconden in plaats van bij de
+        | volgende verversronde. Stond het al in de wacht, dan ligt die
+        | opdracht er ook al en hoeft er niets bij.
+        */
+        if ($previous?->status !== SiteDetail::PENDING) {
+            $this->queue?->push($domain);
+        }
 
         $bytes = $this->monogramBytes($domain);
 

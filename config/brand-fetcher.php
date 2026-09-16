@@ -111,6 +111,18 @@ return [
     'on_miss' => env('BRAND_FETCHER_ON_MISS', 'monogram'),
 
     /*
+    | Een domein dat in de wacht komt ook meteen op de queue zetten, zodat het
+    | echte logo er binnen seconden staat in plaats van bij de volgende ronde
+    | van brand-fetcher:refresh.
+    |
+    | Ligt er geen echte queue klaar, dus met sync of null als verbinding, dan
+    | gebeurt er niets: met sync zou de opdracht in het webverzoek zelf draaien
+    | en dat is juist wat on_miss op monogram voorkomt. De verversopdracht
+    | blijft in alle gevallen het vangnet.
+    */
+    'queue' => (bool) env('BRAND_FETCHER_QUEUE', true),
+
+    /*
     |--------------------------------------------------------------------------
     | Grenzen
     |--------------------------------------------------------------------------

@@ -102,6 +102,13 @@ Met `monogram` wordt geen enkel webverzoek traag, ook niet als iemand een pagina
 met vijftig onbekende domeinen opent. Een bestand met de stand `pending` is de
 wachtrij: dat kost een klein bestandje en geen enkele infrastructuur.
 
+Draait er een queue-werker, dan gaat dat domein er ook meteen op en staat het
+echte logo er binnen seconden in plaats van bij de volgende verversronde. Dat
+staat aan met `queue`. Is de verbinding `sync` of `null`, dan gebeurt er niets:
+met `sync` zou die opdracht in het webverzoek zelf draaien, en dat is juist wat
+`monogram` voorkomt. `brand-fetcher:refresh` blijft in alle gevallen het
+vangnet, dus zonder queue werkt alles zoals voorheen.
+
 ## Verversen
 
 ```bash
@@ -160,6 +167,7 @@ echte index voor, en die past niet in een package dat geen databank mag eisen.
 | `size` | `128` | de zijde van het vierkante beeld |
 | `pad` | `edge` | de lucht rond het logo opvullen met de randkleur, of `transparent` |
 | `on_miss` | `monogram` | zie hierboven |
+| `queue` | `true` | een domein in de wacht ook op de queue zetten, als er een echte is |
 | `ttl_ok` | 30 dagen | hoe lang een gevonden logo meegaat |
 | `ttl_monogram` | 7 dagen | een site kan alsnog een favicon krijgen |
 | `ttl_error` | 1 dag | verdubbelt bij herhaald falen |
