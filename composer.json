@@ -1,0 +1,66 @@
+{
+    "name": "hansdeboeck/laravel-brand-fetcher",
+    "description": "Haalt het logo van een domein op bij dat domein zelf en levert het als vierkante webp, plus de sociale profielen die op dezelfde voorpagina staan.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["laravel", "logo", "favicon", "brand", "webp", "social"],
+    "authors": [
+        {
+            "name": "Hans De Boeck"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "ext-dom": "*",
+        "ext-gd": "*",
+        "ext-intl": "*",
+        "ext-json": "*",
+        "guzzlehttp/guzzle": "^7.9",
+        "illuminate/cache": "^12.0|^13.0",
+        "illuminate/console": "^12.0|^13.0",
+        "illuminate/contracts": "^12.0|^13.0",
+        "illuminate/filesystem": "^12.0|^13.0",
+        "illuminate/http": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0",
+        "league/uri": "^7.5"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^10.0|^11.0",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.0"
+    },
+    "suggest": {
+        "league/flysystem-aws-s3-v3": "Nodig zodra BRAND_FETCHER_DISK naar een s3-disk wijst. Dit package praat enkel met de filesystem-factory en eist de driver bewust niet."
+    },
+    "autoload": {
+        "psr-4": {
+            "HansDeBoeck\\BrandFetcher\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "HansDeBoeck\\BrandFetcher\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "HansDeBoeck\\BrandFetcher\\BrandFetcherServiceProvider"
+            ],
+            "aliases": {
+                "BrandFetcher": "HansDeBoeck\\BrandFetcher\\Facades\\BrandFetcher"
+            }
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
