@@ -198,3 +198,27 @@ it('leest een ico als de site alleen een favicon heeft', function (): void {
     expect($result->status)->toBe(SiteDetail::OK)
         ->and($result->source)->toBe('favicon.ico');
 });
+
+/*
+| De kandidatenlijst wordt twee keer gelezen, voor de keuze en voor de svg-url,
+| maar hij hoort maar een keer verzameld te worden. Gebeurt dat niet, dan gaat
+| elke bron die er zelf het net voor op moet ook twee keer op pad, en het
+| manifest is daar de oudste van.
+*/
+it('haalt het manifest maar een keer op', function (): void {
+    fakeSite(
+        ['links' => ['<link rel="manifest" href="/site.webmanifest">']],
+        [
+            'https://acme.be/site.webmanifest' => Http::response(
+                manifestFixture([['src' => '/icon.png', 'sizes' => '512x512', 'type' => 'image/png']]),
+            ),
+            'https://acme.be/icon.png' => Http::response(pngFixture(512, 512), 200, ['Content-Type' => 'image/png']),
+        ],
+    );
+
+    expect(fetcher()->logo('acme.be')->source)->toBe('manifest');
+
+    expect(collect(Http::recorded())
+        ->filter(fn (array $paar): bool => str_contains($paar[0]->url(), 'webmanifest'))
+        ->count())->toBe(1);
+});

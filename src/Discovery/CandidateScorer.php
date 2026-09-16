@@ -25,7 +25,22 @@ final class CandidateScorer
         'apple-touch-icon' => 95,
         'jsonld' => 85,
         'link-icon' => 80,
+        /*
+        | Een bedrijfspagina die de site zelf aanwijst weegt even zwaar als een
+        | link rel=icon: het is een verklaring van de eigenaar, en net als die
+        | link moet hij het op de meting nog waarmaken.
+        */
+        'linkedin' => 80,
         'tile-image' => 68,
+        /*
+        | Facebook levert een veel groter en schoner bestand dan linkedin en
+        | wint dus al op de meting. Dit gewicht compenseert dat, zodat beide
+        | sociale bronnen in dezelfde band uitkomen: boven een kleine favicon,
+        | onder een echt app-icoon, en met een plafond van 188 net onder
+        | good_enough_score, zodat ze de zoektocht nooit afbreken voordat de
+        | eigen iconen van de site gemeten zijn.
+        */
+        'facebook' => 58,
         'apple-touch-icon-implied' => 55,
         'favicon.ico' => 45,
         'og:image' => 30,

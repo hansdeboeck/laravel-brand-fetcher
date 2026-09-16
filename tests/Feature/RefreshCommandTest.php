@@ -17,6 +17,10 @@ beforeEach(function (): void {
         'https://*/apple-touch-icon.png' => Http::response('', 404),
         'https://*/favicon.ico' => Http::response('', 404),
         'https://*/touch.png' => fn () => Http::response(pngFixture(256, 256), 200, ['Content-Type' => 'image/png']),
+        // Let op: Str::is laat de ster ook over schuine strepen lopen, dus deze
+        // sleutel vangt ook www.linkedin.com en graph.facebook.com. Krijgt een
+        // fixture hier ooit een sociaal profiel, dan komt daar stilletjes deze
+        // voorpagina uit in plaats van een fout over een onverwacht verzoek.
         'https://*/' => fn () => Http::response(htmlFixture([
             'links' => ['<link rel="apple-touch-icon" sizes="256x256" href="/touch.png">'],
         ])),

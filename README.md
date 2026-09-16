@@ -7,6 +7,31 @@ er gratis bij: een bezoek aan andermans site bedient allebei.
 Geen upstream-dienst, geen sleutel, geen databank. Wat het nodig heeft is gd met
 webp-ondersteuning en een Laravel-disk om op te schrijven.
 
+## Demo
+
+Op [www.deboeck.dev/merk](https://www.deboeck.dev/merk) staat een proefpagina die
+op dit package draait: tik een domein in en je ziet wat eruit komt, het logo en de
+sociale profielen naast elkaar. Onder dat formulier staan de twee open eindpunten
+van diezelfde site, zonder sleutel en zonder registratie:
+
+| Eindpunt | Wat je krijgt | Rem |
+|---|---|---|
+| `GET https://api.deboeck.dev/v1/brand/{domein}` | het logo als vierkante webp van 128 pixels | 60 per minuut per ip |
+| `GET https://api.deboeck.dev/v1/brand/{domein}/social` | de profielen als json | 5 per minuut per ip |
+
+```bash
+curl -s https://api.deboeck.dev/v1/brand/kringwinkel.be/social
+```
+
+Het beeld kan rechtstreeks in de opmaak:
+
+```html
+<img src="https://api.deboeck.dev/v1/brand/kringwinkel.be" width="128" height="128" alt="Kringwinkel">
+```
+
+Die eindpunten horen bij die applicatie en niet bij dit package: de routes, de rem
+en het bot-slot staan daar.
+
 ## Requirements
 
 PHP 8.3 of hoger met **gd (met webp), dom, intl en json**, en Laravel 12 of 13.
@@ -143,6 +168,8 @@ echte index voor, en die past niet in een package dat geen databank mag eisen.
 | `user_agent` | zie config | **zet hier een contactadres in** |
 | `pin_dns` | `true` | de verbinding pinnen op het gecontroleerde adres |
 | `social` | `true` | de profielen mee ophalen |
+| `facebook_logo` | `true` | de avatar van de facebook-bedrijfspagina meenemen |
+| `linkedin_logo` | `true` | de avatar van de linkedin-bedrijfspagina meenemen |
 
 Alle sleutels staan in [`config/brand-fetcher.php`](config/brand-fetcher.php) met
 een env-naam in de vorm `BRAND_FETCHER_*`.
@@ -152,6 +179,14 @@ een env-naam in de vorm `BRAND_FETCHER_*`.
 Kandidaten komen uit `link rel=icon` en `apple-touch-icon`, uit het webmanifest,
 uit `og:image` en `twitter:image`, uit `Organization.logo` in de json-ld, en als
 vangnet uit `/favicon.ico` en `/apple-touch-icon.png`.
+
+Daar komt de **avatar van de bedrijfspagina** bij, als er een facebook- of
+linkedin-profiel gevonden is. Voor een site die zelf niets in zijn head zet, is
+dat vaak het beste logo dat publiek te vinden is: vierkant, bijgesneden en door
+de eigenaar zelf gekozen. Hij dingt gewoon mee en wint alleen op de meting, dus
+een echt app-icoon van de site zelf blijft voorgaan; tegen een favicon van
+tweeendertig pixels wint hij. Beide bronnen praten rechtstreeks met het platform,
+er komt geen tussenpartij aan te pas.
 
 Het scoren gebeurt in twee fasen, en dat onderscheid is de kern:
 
@@ -187,6 +222,12 @@ De afnemer kiest het domein en deze server gaat het bezoeken. Daarom:
 - de verbinding wordt gepind op het adres dat net goedgekeurd is;
 - de parser draait met `LIBXML_NONET`, anders zou libxml zelf een externe dtd
   kunnen ophalen waar de pagina naar wijst.
+
+Staan `facebook_logo` of `linkedin_logo` aan, dan raakt een ophaling ook
+`graph.facebook.com`, `*.fbcdn.net`, `www.linkedin.com` en `media.licdn.com`.
+Wie met een egress-allowlist werkt moet die vier kennen, of de twee sleutels
+uitzetten. Beide bronnen worden alleen bekeken als er een profiel gevonden is en
+`social` aanstaat.
 
 ## Testen
 

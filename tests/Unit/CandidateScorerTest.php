@@ -64,3 +64,32 @@ it('haalt een vierkante bron van 256 boven de drempel voor goed genoeg', functio
     expect($this->scorer->hard(candidate('apple-touch-icon', 256, 'image/png', 256, 256)))
         ->toBeGreaterThanOrEqual(config('brand-fetcher.good_enough_score'));
 });
+
+it('zet een sociale avatar boven een kleine favicon en onder een echt app-icoon', function (): void {
+    $facebook = $this->scorer->hard(candidate('facebook', 480, 'image/png', 480, 480, false));
+    $linkedin = $this->scorer->hard(candidate('linkedin', 200, 'image/jpeg', 200, 200, false));
+    $favicon = $this->scorer->hard(candidate('favicon.ico', null, null, 32, 32));
+    $apple = $this->scorer->hard(candidate('apple-touch-icon', 180, 'image/png', 180, 180));
+
+    expect($facebook)->toBeGreaterThan($favicon)
+        ->and($linkedin)->toBeGreaterThan($favicon)
+        ->and($apple)->toBeGreaterThan($facebook)
+        ->and($apple)->toBeGreaterThan($linkedin);
+});
+
+/*
+| De wacht op de gewichten van de sociale bronnen.
+|
+| Komt zo'n avatar op of boven good_enough_score, dan stopt de downloadlus bij
+| hem en krijgen de eigen iconen van de site geen kans meer om gemeten te
+| worden. Ze mogen dus meedingen, maar nooit afbreken. Hier staat de zwaarste
+| variant die elk van de twee kan opleveren: de grootste uitsnede, en met alfa
+| omdat het trimmen van een niet-vierkant logo transparante randen achterlaat.
+*/
+it('laat een sociale avatar de zoektocht nooit afbreken', function (string $bron, int $maat, string $mime): void {
+    expect($this->scorer->hard(candidate($bron, $maat, $mime, $maat, $maat, true)))
+        ->toBeLessThan((int) config('brand-fetcher.good_enough_score'));
+})->with([
+    'facebook' => ['facebook', 480, 'image/png'],
+    'linkedin' => ['linkedin', 400, 'image/jpeg'],
+]);

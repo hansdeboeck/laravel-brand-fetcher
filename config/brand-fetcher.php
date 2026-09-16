@@ -164,6 +164,44 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | De avatar van een sociale bedrijfspagina als logobron
+    |--------------------------------------------------------------------------
+    |
+    | Levert de site zelf niets bruikbaars, dan is de avatar van de
+    | bedrijfspagina vaak het beste logo dat publiek te vinden is: vierkant,
+    | bijgesneden en door de eigenaar zelf gekozen. Hij dingt gewoon mee met de
+    | rest en wint alleen op de meting, dus een echt app-icoon van de site
+    | blijft voorgaan.
+    |
+    | Deze bronnen werken alleen als social hierboven aan staat: zonder
+    | gevonden profielen is er geen pagina om te bekijken. Beide praten
+    | rechtstreeks met het platform zelf, er komt geen tussenpartij aan te pas.
+    */
+
+    // Kost een json-verzoek van een paar honderd byte aan graph.facebook.com
+    // per domein waar een pagina van gevonden is.
+    'facebook_logo' => (bool) env('BRAND_FETCHER_FACEBOOK_LOGO', true),
+
+    // Wat we bij graph opvragen. Vierhonderd levert in de praktijk 480 pixels,
+    // en dat is de zoete plek van sizeBonus: 256 tot 511 telt zwaarder dan 512
+    // en meer. Groter vragen kost dus bandbreedte en scoort lager.
+    'facebook_width' => (int) env('BRAND_FETCHER_FACEBOOK_WIDTH', 400),
+
+    // Kost een extra verzoek naar www.linkedin.com. Daar wordt alleen de kop
+    // van gelezen, dus ongeveer dertien kilobyte van een pagina die er bijna
+    // vijfhonderd telt.
+    'linkedin_logo' => (bool) env('BRAND_FETCHER_LINKEDIN_LOGO', true),
+
+    // De og:image staat ruim voor </head>, waar SafeHttp vanzelf stopt. Dit is
+    // de vangrail voor als linkedin die tag ooit verplaatst.
+    'linkedin_max_bytes' => (int) env('BRAND_FETCHER_LINKEDIN_MAX_BYTES', 32768),
+
+    // Korter dan asset_timeout: een avatar is een omweg binnen hetzelfde
+    // budget, en een omweg hoort als eerste te sneuvelen als de tijd op raakt.
+    'social_timeout' => (float) env('BRAND_FETCHER_SOCIAL_TIMEOUT', 2),
+
+    /*
+    |--------------------------------------------------------------------------
     | Verversen
     |--------------------------------------------------------------------------
     |

@@ -7,6 +7,7 @@ namespace HansDeBoeck\BrandFetcher;
 use HansDeBoeck\BrandFetcher\Contracts\FetchesBrands;
 use HansDeBoeck\BrandFetcher\Crawl\SiteCrawl;
 use HansDeBoeck\BrandFetcher\Crawl\SiteCrawler;
+use HansDeBoeck\BrandFetcher\Discovery\AvatarDiscoverer;
 use HansDeBoeck\BrandFetcher\Discovery\CandidateScorer;
 use HansDeBoeck\BrandFetcher\Discovery\IconCandidate;
 use HansDeBoeck\BrandFetcher\Discovery\IconDiscoverer;
@@ -63,7 +64,7 @@ class BrandFetcher implements FetchesBrands
     ) {
         $this->scorer = new CandidateScorer();
         $this->crawler = new SiteCrawler($http, $config);
-        $this->discoverer = new IconDiscoverer($http, $this->scorer, $config);
+        $this->discoverer = new IconDiscoverer($http, $this->scorer, $config, new AvatarDiscoverer($http, $config));
         $this->social = new SocialDiscoverer(config: $config);
         $this->transcoder = new ImageTranscoder();
         $this->monogram = new MonogramRenderer();
@@ -209,7 +210,16 @@ class BrandFetcher implements FetchesBrands
         }
 
         $social = $this->social->discover($crawl);
-        $chosen = $this->bestCandidate($crawl, $budget);
+
+        /*
+        | De kandidaten een keer verzamelen en daarna doorgeven. Deze lijst
+        | wordt twee keer gelezen, voor de keuze en voor de svg-url, en
+        | sommige bronnen gaan er zelf het net voor op: een manifest ophalen,
+        | een bedrijfspagina lezen. Opnieuw laten verzamelen zou dat verkeer
+        | verdubbelen.
+        */
+        $candidates = $this->discoverer->discover($crawl, $budget, $social['profiles']);
+        $chosen = $this->bestCandidate($candidates, $budget);
 
         if ($chosen === null) {
             $detail = $this->detail(
@@ -218,7 +228,7 @@ class BrandFetcher implements FetchesBrands
                 crawl: $crawl,
                 social: $social,
                 error: 'no_usable_candidate',
-                svgUrl: $this->svgUrl($crawl, $budget),
+                svgUrl: $this->svgUrl($candidates),
             );
 
             return $this->store->write($detail, $this->monogramBytes($domain));
@@ -240,7 +250,7 @@ class BrandFetcher implements FetchesBrands
             sourceRatio: $transcode->sourceRatio,
             hasAlpha: $transcode->hasAlpha,
             trimmed: $transcode->trimmed,
-            svgUrl: $this->svgUrl($crawl, $budget),
+            svgUrl: $this->svgUrl($candidates),
         );
 
         return $this->store->write($detail, $transcode->bytes);
@@ -249,12 +259,11 @@ class BrandFetcher implements FetchesBrands
     /**
      * Downloadt kandidaten tot er een goed genoeg is.
      *
+     * @param  list<IconCandidate>  $candidates
      * @return array{0: IconCandidate, 1: \HansDeBoeck\BrandFetcher\Image\TranscodeResult}|null
      */
-    private function bestCandidate(SiteCrawl $crawl, Budget $budget): ?array
+    private function bestCandidate(array $candidates, Budget $budget): ?array
     {
-        $candidates = $this->discoverer->discover($crawl, $budget);
-
         $maxDownloads = max(1, (int) ($this->config['max_downloads'] ?? 3));
         $goodEnough = (int) ($this->config['good_enough_score'] ?? 190);
         $timeout = (float) ($this->config['asset_timeout'] ?? 3);
@@ -312,10 +321,14 @@ class BrandFetcher implements FetchesBrands
         return $best;
     }
 
-    /** De best scorende svg, alleen om te onthouden. */
-    private function svgUrl(SiteCrawl $crawl, Budget $budget): ?string
+    /**
+     * De best scorende svg, alleen om te onthouden.
+     *
+     * @param  list<IconCandidate>  $candidates
+     */
+    private function svgUrl(array $candidates): ?string
     {
-        foreach ($this->discoverer->discover($crawl, $budget) as $candidate) {
+        foreach ($candidates as $candidate) {
             if ($candidate->isSvg()) {
                 return $candidate->url;
             }

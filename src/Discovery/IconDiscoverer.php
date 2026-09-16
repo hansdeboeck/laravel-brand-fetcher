@@ -9,6 +9,7 @@ use HansDeBoeck\BrandFetcher\Crawl\SiteCrawl;
 use HansDeBoeck\BrandFetcher\Net\Budget;
 use HansDeBoeck\BrandFetcher\Net\SafeHttp;
 use HansDeBoeck\BrandFetcher\Net\Url;
+use HansDeBoeck\BrandFetcher\Social\SocialProfile;
 
 /** Verzamelt alles wat op deze pagina een logo zou kunnen zijn. */
 final class IconDiscoverer
@@ -18,10 +19,14 @@ final class IconDiscoverer
         private readonly SafeHttp $http,
         private readonly CandidateScorer $scorer = new CandidateScorer(),
         private readonly array $config = [],
+        private readonly ?AvatarDiscoverer $avatars = null,
     ) {}
 
-    /** @return list<IconCandidate> op papieren score, de belofterijkste eerst */
-    public function discover(SiteCrawl $crawl, Budget $budget): array
+    /**
+     * @param  array<string, SocialProfile>  $profiles  wat SocialDiscoverer vond
+     * @return list<IconCandidate> op papieren score, de belofterijkste eerst
+     */
+    public function discover(SiteCrawl $crawl, Budget $budget, array $profiles = []): array
     {
         if (! $crawl->ok()) {
             return [];
@@ -46,6 +51,10 @@ final class IconDiscoverer
         }
 
         foreach ($this->implicit($crawl) as $candidate) {
+            $candidates[] = $candidate;
+        }
+
+        foreach ($this->avatars?->discover($profiles, $budget) ?? [] as $candidate) {
             $candidates[] = $candidate;
         }
 
