@@ -8,7 +8,11 @@ use GdImage;
 
 /**
  * De terugval als er geen logo te vinden is: de beginletter van het domein,
- * wit op een gekleurde schijf.
+ * wit op een gekleurd vierkant.
+ *
+ * Een vierkant en geen schijf: alles wat dit package aflevert vult zijn vlak
+ * tot in de hoeken, en een ronde terugval tussen vierkante logo's valt uit de
+ * toon.
  *
  * De kleur volgt uit het domein zelf, zodat dezelfde site altijd dezelfde tint
  * krijgt. Anders zou een verversing het beeld laten verspringen op elke pagina
@@ -35,22 +39,16 @@ final class MonogramRenderer
 
         $letter = $this->letter($domain);
 
-        $canvas = imagecreatetruecolor($size, $size);
-        imagealphablending($canvas, false);
-        imagesavealpha($canvas, true);
-        imagefilledrectangle($canvas, 0, 0, $size - 1, $size - 1, imagecolorallocatealpha($canvas, 0, 0, 0, 127));
-
         [$red, $green, $blue] = $this->tint($domain);
 
-        imagealphablending($canvas, true);
-        imagefilledellipse($canvas, intdiv($size, 2), intdiv($size, 2), $size, $size, imagecolorallocate($canvas, $red, $green, $blue));
+        // Blending staat aan op een vers canvas, en dat hoort ook: de letter
+        // wordt straks met vloeiende randen op deze kleur gezet.
+        $canvas = imagecreatetruecolor($size, $size);
+        imagefilledrectangle($canvas, 0, 0, $size - 1, $size - 1, imagecolorallocate($canvas, $red, $green, $blue));
 
         if (! $this->drawLetter($canvas, $letter, $size, $font)) {
             return null;
         }
-
-        imagealphablending($canvas, false);
-        imagesavealpha($canvas, true);
 
         ob_start();
         imagewebp($canvas, null, (int) ($config['quality'] ?? 82));
