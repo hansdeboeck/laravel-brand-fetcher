@@ -16,6 +16,22 @@ function fakePage(array $options): void
     Http::fake(['https://acme.be/' => Http::response(htmlFixture($options))]);
 }
 
+it('crawlt niet opnieuw voor profielen die al gelezen zijn', function (): void {
+    // Het beeld staat nog in de wacht, maar de json-vraag is beantwoord: de
+    // voorpagina van een ander opnieuw ophalen levert niemand iets op.
+    fakePage(['jsonld' => ['@type' => 'Organization', 'sameAs' => ['https://www.facebook.com/Acme']]]);
+
+    app(BrandFetcher::class)->profile('acme.be');
+
+    // Een vers verzoek, alsof een andere bezoeker de json opvraagt: anders
+    // verbergt de memo van de crawl wat er gebeurt.
+    app()->forgetInstance(BrandFetcher::class);
+
+    expect(app(BrandFetcher::class)->profile('acme.be')->for('facebook')->url)
+        ->toBe('https://facebook.com/Acme')
+        ->and(count(Http::recorded()))->toBe(1);
+});
+
 it('haalt de profielen uit sameAs in de json-ld', function (): void {
     fakePage(['jsonld' => [
         '@context' => 'https://schema.org',

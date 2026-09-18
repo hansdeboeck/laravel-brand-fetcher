@@ -83,6 +83,25 @@ it('valt terug op een monogram als er niets bruikbaars staat', function (): void
     expect(getimagesizefromstring((string) $result->contents())[0])->toBe(128);
 });
 
+it('blijft bij een afgewerkt antwoord, ook zonder bestand', function (): void {
+    // Zonder monogram komt er geen bestand, dus alleen de verlooptijd houdt een
+    // volgend verzoek tegen. Zonder dat zou elke opvraging opnieuw crawlen.
+    config()->set('brand-fetcher.monogram', false);
+
+    fakeSite();
+
+    expect(fetcher()->logo('acme.be')->status)->toBe(SiteDetail::MONOGRAM);
+
+    $verzonden = count(Http::recorded());
+
+    // Een vers verzoek, alsof een andere bezoeker langskomt: anders verbergt de
+    // memo van de crawl wat er gebeurt.
+    app()->forgetInstance(BrandFetcher::class);
+
+    expect(fetcher()->logo('acme.be')->status)->toBe(SiteDetail::MONOGRAM)
+        ->and(count(Http::recorded()))->toBe($verzonden);
+});
+
 it('doet geen enkel verzoek als er al een bestand staat', function (): void {
     fakeSite(
         ['links' => ['<link rel="apple-touch-icon" href="/touch.png">']],

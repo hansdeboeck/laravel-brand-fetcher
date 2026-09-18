@@ -97,9 +97,23 @@ class BrandFetcher implements FetchesBrands
         /*
         | Staat er een bestand, dan gaat dat eruit, ook als het verlopen is.
         | Verouderd is voor een logo goed genoeg, en het alternatief zou zijn
-        | dat een willekeurige bezoeker de rekening van een crawl betaalt.
+        | dat een willekeurige bezoeker de rekening van een crawl betaalt. Wie
+        | het opvraagt zet wel de verversing in gang, zodat de volgende bezoeker
+        | het echte logo ziet.
         */
         if ($detail !== null && $detail->hasFile()) {
+            $this->ensureFresh($detail);
+
+            return $this->toLogoResult($detail);
+        }
+
+        /*
+        | Geen bestand, maar wel een afgewerkt antwoord dat nog niet verlopen is.
+        | Dat is de stand zonder monogram, en zonder deze terugkeer zou elk
+        | verzoek een net opgehaalde entry terug in de wacht zetten en opnieuw
+        | een opdracht maken.
+        */
+        if ($detail !== null && $detail->status !== SiteDetail::PENDING && ! $detail->isStale()) {
             return $this->toLogoResult($detail);
         }
 
@@ -120,8 +134,15 @@ class BrandFetcher implements FetchesBrands
 
         $detail = $refresh ? null : $this->store->detail($normalized);
 
-        // Is er al eens gekeken, dan is dat het antwoord, ook als het oud is.
-        if ($detail !== null && $detail->status !== SiteDetail::PENDING) {
+        /*
+        | Is er al eens gekeken, dan is dat het antwoord, ook als het oud is. Een
+        | entry in de wacht telt mee zodra er een final_url staat: de profielen
+        | zijn dan gelezen en alleen het beeld ontbreekt nog. Dat opnieuw crawlen
+        | bij elk verzoek kost andermans site een voorpagina voor niets.
+        */
+        if ($detail !== null && ($detail->status !== SiteDetail::PENDING || $detail->finalUrl !== null)) {
+            $this->ensureFresh($detail);
+
             return $this->toProfileResult($detail);
         }
 
@@ -130,7 +151,11 @@ class BrandFetcher implements FetchesBrands
 
         if (! $crawl->ok()) {
             $failed = $this->failedDetail($normalized, $crawl, $detail);
-            $this->store->write($failed, null);
+
+            // Met de bytes erbij, want failedDetail zet de monogram-velden in de
+            // details: zonder het bestand belooft detail.json een logo.webp die
+            // er niet staat.
+            $this->store->write($failed, $this->monogramBytes($normalized));
 
             return $this->toProfileResult($failed);
         }
@@ -142,6 +167,7 @@ class BrandFetcher implements FetchesBrands
         $merged = $this->mergeSocial($normalized, $crawl, $detail, $social);
 
         $this->store->write($merged, null);
+        $this->ensureFresh($merged);
 
         return $this->toProfileResult($merged);
     }
@@ -339,6 +365,21 @@ class BrandFetcher implements FetchesBrands
         return null;
     }
 
+    /**
+     * Vraagt een verversing aan voor wat we net uitserveerden.
+     *
+     * Het antwoord zelf verandert niet: wie nu kijkt ziet meteen wat er staat en
+     * wacht nergens op, en de volgende bezoeker ziet het echte logo. Een entry
+     * in de wacht heeft ttl 0 en telt dus altijd mee. De wachtrij bewaakt zelf
+     * dat hetzelfde domein niet bij elke opvraging opnieuw op de rij komt.
+     */
+    private function ensureFresh(SiteDetail $detail): void
+    {
+        if ($detail->isStale()) {
+            $this->queue?->push($detail->domain);
+        }
+    }
+
     private function markPending(string $domain, ?SiteDetail $previous): SiteDetail
     {
         $detail = new SiteDetail(
@@ -352,15 +393,9 @@ class BrandFetcher implements FetchesBrands
             name: $previous?->name,
         );
 
-        /*
-        | Komt dit domein hier voor het eerst, dan gaat het echte werk naar de
-        | queue: dan staat het logo er binnen seconden in plaats van bij de
-        | volgende verversronde. Stond het al in de wacht, dan ligt die
-        | opdracht er ook al en hoeft er niets bij.
-        */
-        if ($previous?->status !== SiteDetail::PENDING) {
-            $this->queue?->push($domain);
-        }
+        // Het echte werk gaat naar de queue: dan staat het logo er binnen
+        // seconden in plaats van bij de volgende verversronde.
+        $this->queue?->push($domain);
 
         $bytes = $this->monogramBytes($domain);
 

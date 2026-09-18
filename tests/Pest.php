@@ -3,8 +3,22 @@
 declare(strict_types=1);
 
 use HansDeBoeck\BrandFetcher\Tests\TestCase;
+use Illuminate\Support\Facades\Storage;
 
 uses(TestCase::class)->in(__DIR__);
+
+/**
+ * Verouder een entry echt.
+ *
+ * De mtime van detail.json is de klok, niet het veld in het bestand: dat is het
+ * enige dat een lokale schijf en s3 allebei gratis kunnen vertellen. Een oude
+ * datum in de json zetten verandert dus niets, en dat hoort ook zo.
+ */
+function verouder(string $domain, int $seconden = 100): void
+{
+    touch(Storage::disk('local')->path('hans/brand/' . $domain . '/detail.json'), time() - $seconden);
+    clearstatcache();
+}
 
 /*
 | Alle beeldfixtures worden hier in php gemaakt en staan dus niet als binair

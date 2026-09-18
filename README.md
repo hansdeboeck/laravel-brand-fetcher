@@ -109,6 +109,13 @@ met `sync` zou die opdracht in het webverzoek zelf draaien, en dat is juist wat
 `monogram` voorkomt. `brand-fetcher:refresh` blijft in alle gevallen het
 vangnet, dus zonder queue werkt alles zoals voorheen.
 
+Dat geldt niet alleen voor een onbekend domein: wie het beeld of de json opvraagt
+van een domein dat nog in de wacht staat of waarvan de verlooptijd om is, zet
+diezelfde opdracht in gang. Het antwoord blijft meteen komen, met wat er nu
+staat; de volgende bezoeker ziet het verse logo. Hetzelfde domein komt hoogstens
+een keer per `queue_cooldown` op de rij, want een beeld in een `<img>` wordt per
+paginaweergave opgevraagd.
+
 ## Verversen
 
 ```bash

@@ -32,6 +32,9 @@ class RefreshBrandsCommand extends Command
 
     protected $description = 'Ververst de opgeslagen logos en sociale profielen.';
 
+    /** @var array<string, true> De domeinen die deze ronde voorrang kregen. */
+    private array $priority = [];
+
     public function handle(BrandFetcher $fetcher, BrandStore $store): int
     {
         $domains = array_values(array_filter((array) $this->argument('domain')));
@@ -55,7 +58,13 @@ class RefreshBrandsCommand extends Command
 
             $detail = $fetcher->refresh($domain);
             $done++;
-            $last = $domain;
+
+            // De cursor onthoudt alleen waar de verlopen rij gebleven was. Een
+            // domein met voorrang staat op een willekeurige plek in het alfabet
+            // en zou alles ertussen een ronde laten overslaan.
+            if (! isset($this->priority[$domain])) {
+                $last = $domain;
+            }
 
             $this->line(sprintf(
                 '  %-42s %-9s %s',
@@ -116,6 +125,8 @@ class RefreshBrandsCommand extends Command
                 $stale[] = $entry['domain'];
             }
         }
+
+        $this->priority = array_fill_keys($pending, true);
 
         $targets = array_merge($pending, $stale);
 

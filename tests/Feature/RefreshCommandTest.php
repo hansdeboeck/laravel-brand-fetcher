@@ -27,19 +27,6 @@ beforeEach(function (): void {
     ]);
 });
 
-/**
- * Verouder een entry echt.
- *
- * De mtime van detail.json is de klok, niet het veld in het bestand: dat is het
- * enige dat een lokale schijf en s3 allebei gratis kunnen vertellen. Een oude
- * datum in de json zetten verandert dus niets, en dat hoort ook zo.
- */
-function verouder(string $domain, int $seconden = 100): void
-{
-    touch(Storage::disk('local')->path('hans/brand/' . $domain . '/detail.json'), time() - $seconden);
-    clearstatcache();
-}
-
 function opgehaald(): array
 {
     return collect(Http::recorded())
@@ -116,6 +103,23 @@ it('verwijdert een domein op verzoek', function (): void {
 
     expect($this->store->detail('weg.be'))->toBeNull();
     Storage::disk('local')->assertMissing('hans/brand/weg.be/logo.webp');
+});
+
+it('verzet de cursor niet voor een domein met voorrang', function (): void {
+    // Wat geen beeld heeft gaat voor, maar staat op een willekeurige plek in het
+    // alfabet. Zou de cursor daarheen springen, dan slaat de volgende ronde
+    // alles ertussen over.
+    $this->store->write(new SiteDetail(domain: 'zonderbeeld.be', status: SiteDetail::PENDING), null);
+    $this->store->write(
+        new SiteDetail(domain: 'ander.be', status: SiteDetail::OK, ttl: 60, logoBytes: 10),
+        'bytes',
+    );
+
+    verouder('ander.be', 3600);
+
+    $this->artisan('brand-fetcher:refresh', ['--max' => 1])->assertSuccessful();
+
+    expect($this->store->readCursor())->toBeNull();
 });
 
 it('onthoudt tussen twee rondes waar het gebleven was', function (): void {

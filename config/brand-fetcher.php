@@ -123,6 +123,15 @@ return [
     'queue' => (bool) env('BRAND_FETCHER_QUEUE', true),
 
     /*
+    | Hoe lang hetzelfde domein na een opdracht met rust gelaten wordt.
+    |
+    | Een beeld hangt in een img-tag en wordt per paginaweergave opgevraagd.
+    | Zonder afkoelperiode zou elke bezoeker van dezelfde pagina dezelfde
+    | opdracht opnieuw op de rij zetten. Op nul staat de bewaking uit.
+    */
+    'queue_cooldown' => (int) env('BRAND_FETCHER_QUEUE_COOLDOWN', 300),
+
+    /*
     |--------------------------------------------------------------------------
     | Grenzen
     |--------------------------------------------------------------------------
